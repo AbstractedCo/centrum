@@ -154,3 +154,7 @@ impl pallet_sudo::Config for Runtime {
     type RuntimeCall = RuntimeCall;
     type WeightInfo = pallet_sudo::weights::SubstrateWeight<Runtime>;
 }
+
+impl pallet_mpc_manager::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+}

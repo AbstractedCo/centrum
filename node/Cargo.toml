@@ -19,6 +19,11 @@ clap = { features = ["derive"], workspace = true }
 futures = { features = ["thread-pool"], workspace = true }
 serde_json = { workspace = true, default-features = true }
 jsonrpsee = { features = ["server"], workspace = true }
+codec = { workspace = true }
+
+centrum-mpc-node = { workspace = true, default-features = true }
+pallet-mpc-manager-runtime-api = { workspace = true, default-features = true }
+pallet-mpc-manager = { workspace = true, default-features = true }
 
 # substrate client
 sc-cli = { workspace = true, default-features = true }

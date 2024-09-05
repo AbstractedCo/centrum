@@ -42,8 +42,8 @@ use sp_version::RuntimeVersion;
 
 // Local module imports
 use super::{
-    AccountId, Aura, Balance, Block, Executive, Grandpa, InherentDataExt, Nonce, Runtime,
-    RuntimeCall, RuntimeGenesisConfig, SessionKeys, System, TransactionPayment, VERSION,
+    AccountId, Aura, Balance, Block, Executive, Grandpa, InherentDataExt, MpcManager, Nonce,
+    Runtime, RuntimeCall, RuntimeGenesisConfig, SessionKeys, System, TransactionPayment, VERSION,
 };
 
 impl_runtime_apis! {
@@ -290,6 +290,20 @@ impl_runtime_apis! {
 
         fn preset_names() -> Vec<sp_genesis_builder::PresetId> {
             vec![]
+        }
+    }
+
+    impl pallet_mpc_manager_runtime_api::MpcManagerApi<Block, AccountId> for Runtime {
+        fn protocol_state() -> pallet_mpc_manager::ProtocolState<AccountId> {
+            MpcManager::get_protocol_state()
+        }
+
+        fn signature_requests() -> Vec<pallet_mpc_manager::Request> {
+            MpcManager::get_signature_requests()
+        }
+
+        fn derive_account(account_id: AccountId, path: Vec<u8>) -> pallet_mpc_manager::PublicKey {
+            MpcManager::derive_account(&account_id, path)
         }
     }
 }

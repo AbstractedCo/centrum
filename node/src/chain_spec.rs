@@ -52,6 +52,22 @@ pub fn development_config() -> Result<ChainSpec, String> {
             get_account_id_from_seed::<sr25519::Public>("Bob"),
             get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
             get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
+            sr25519::Pair::from_phrase(
+                "result comic satoshi spike awake echo mystery undo mouse fog borrow dash",
+                None,
+            )
+            .unwrap()
+            .0
+            .public()
+            .into(),
+            sr25519::Pair::from_phrase(
+                "chat defense bird siren cream bargain absurd ripple lonely gasp thing fit",
+                None,
+            )
+            .unwrap()
+            .0
+            .public()
+            .into(),
         ],
         true,
     ))

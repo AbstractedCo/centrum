@@ -14,11 +14,20 @@ resolver = "2"
 
 [workspace.dependencies]
 centrum-runtime = { path = "./runtime", default-features = false }
+
+centrum-mpc-node = { git = "https://github.com/Abstracted-Labs/centrum-mpc" }
+pallet-mpc-manager = { git = "https://github.com/Abstracted-Labs/centrum-mpc", default-features = false }
+pallet-mpc-manager-runtime-api = { git = "https://github.com/Abstracted-Labs/centrum-mpc", default-features = false }
+
 clap = { version = "4.5.3" }
-frame-benchmarking-cli = { version = "42.0.0", default-features = false }
-frame-system = { version = "37.0.0", default-features = false }
+getrandom = { version = "*", features = ["js"], default-features = false }
 futures = { version = "0.3.30" }
 jsonrpsee = { version = "0.23.2" }
+codec = { version = "3.6.12", default-features = false, package = "parity-scale-codec" }
+scale-info = { version = "2.11.1", default-features = false }
+
+frame-benchmarking-cli = { version = "42.0.0", default-features = false }
+frame-system = { version = "37.1.0", default-features = false }
 pallet-transaction-payment = { version = "37.0.0", default-features = false }
 pallet-transaction-payment-rpc = { version = "40.0.0", default-features = false }
 sc-basic-authorship = { version = "0.44.0", default-features = false }
@@ -43,13 +52,11 @@ sp-consensus-aura = { version = "0.40.0", default-features = false }
 sp-consensus-grandpa = { version = "21.0.0", default-features = false }
 sp-core = { version = "34.0.0", default-features = false }
 sp-inherents = { version = "34.0.0", default-features = false }
-sp-io = { version = "38.0.0", default-features = false }
 sp-keyring = { version = "39.0.0", default-features = false }
 sp-runtime = { version = "39.0.0", default-features = false }
 sp-timestamp = { version = "34.0.0", default-features = false }
 substrate-frame-rpc-system = { version = "38.0.0", default-features = false }
 substrate-build-script-utils = { version = "11.0.0", default-features = false }
-codec = { version = "3.6.12", default-features = false, package = "parity-scale-codec" }
 frame-benchmarking = { version = "37.0.0", default-features = false }
 frame-executive = { version = "37.0.0", default-features = false }
 frame-metadata-hash-extension = { version = "0.5.0", default-features = false }
@@ -63,7 +70,6 @@ pallet-grandpa = { version = "37.0.0", default-features = false }
 pallet-sudo = { version = "37.0.0", default-features = false }
 pallet-timestamp = { version = "36.0.0", default-features = false }
 pallet-transaction-payment-rpc-runtime-api = { version = "37.0.0", default-features = false }
-scale-info = { version = "2.11.1", default-features = false }
 sp-genesis-builder = { version = "0.15.0", default-features = false }
 sp-offchain = { version = "34.0.0", default-features = false }
 sp-session = { version = "35.0.0", default-features = false }
@@ -71,3 +77,4 @@ sp-storage = { version = "21.0.0", default-features = false }
 sp-transaction-pool = { version = "34.0.0", default-features = false }
 sp-version = { version = "37.0.0", default-features = false }
 substrate-wasm-builder = { version = "24.0.0", default-features = false }
+sp-io = { version = "38.0.0", default-features = false }

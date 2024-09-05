@@ -11,7 +11,7 @@ use centrum_runtime::{self, apis::RuntimeApi, opaque::Block};
 use sp_consensus_aura::sr25519::AuthorityPair as AuraPair;
 use std::{sync::Arc, time::Duration};
 
-pub(crate) type FullClient = sc_service::TFullClient<
+pub type FullClient = sc_service::TFullClient<
 	Block,
 	RuntimeApi,
 	sc_executor::WasmExecutor<sp_io::SubstrateHostFunctions>,
@@ -156,9 +156,26 @@ pub fn new_full<
 		sc_consensus_grandpa::grandpa_peers_set_config::<_, N>(
 			grandpa_protocol_name.clone(),
 			metrics.clone(),
-			peer_store_handle,
+			peer_store_handle.clone(),
 		);
 	net_config.add_notification_protocol(grandpa_protocol_config);
+
+	let (tss_notif_config, tss_notif_handle) = N::notification_config(
+        String::from("/invarch/tss/1").into(),
+        vec![],
+        1024 * 1024,
+        None,
+        sc_network::config::SetConfig {
+            in_peers: 100,
+            out_peers: 100,
+            reserved_nodes: vec![],
+            non_reserved_mode: sc_network::config::NonReservedPeerMode::Accept,
+        },
+		metrics.clone(),
+		peer_store_handle
+    );
+
+    net_config.add_notification_protocol(tss_notif_config);
 
 	let warp_sync = Arc::new(sc_consensus_grandpa::warp_proof::NetworkProvider::new(
 		backend.clone(),
@@ -226,7 +243,7 @@ pub fn new_full<
 		task_manager: &mut task_manager,
 		transaction_pool: transaction_pool.clone(),
 		rpc_builder: rpc_extensions_builder,
-		backend,
+		backend: backend.clone(),
 		system_rpc_tx,
 		tx_handler_controller,
 		sync_service: sync_service.clone(),
@@ -248,7 +265,7 @@ pub fn new_full<
 		let aura = sc_consensus_aura::start_aura::<AuraPair, _, _, _, _, _, _, _, _, _, _>(
 			StartAuraParams {
 				slot_duration,
-				client,
+				client: client.clone(),
 				select_chain,
 				block_import,
 				proposer_factory,
@@ -308,14 +325,14 @@ pub fn new_full<
 		let grandpa_config = sc_consensus_grandpa::GrandpaParams {
 			config: grandpa_config,
 			link: grandpa_link,
-			network,
+			network: network.clone(),
 			sync: Arc::new(sync_service),
 			notification_service: grandpa_notification_service,
 			voting_rule: sc_consensus_grandpa::VotingRulesBuilder::default().build(),
 			prometheus_registry,
 			shared_voter_state: SharedVoterState::empty(),
 			telemetry: telemetry.as_ref().map(|x| x.handle()),
-			offchain_tx_pool_factory: OffchainTransactionPoolFactory::new(transaction_pool),
+			offchain_tx_pool_factory: OffchainTransactionPoolFactory::new(transaction_pool.clone()),
 		};
 
 		// the GRANDPA voter task is considered infallible, i.e.
@@ -327,6 +344,111 @@ pub fn new_full<
 		);
 	}
 
+	centrum_mpc_node::start_tss_tasks::<
+			centrum_runtime::AccountId,
+		Block,
+		FullClient,
+		sc_transaction_pool::FullPool<Block, FullClient>,
+		centrum_runtime::Runtime,
+		TxCreator
+			>(
+        centrum_mpc_node::StartTSSTasksParams {
+            task_manager: &mut task_manager,
+        },
+        centrum_mpc_node::TSSContext {
+            seed_phrase: std::env::var("SEED").expect("Seed phrase not provided."),
+        },
+        tss_notif_handle,
+        network.clone(),
+        client.clone(),
+        keystore_container.keystore(),
+        transaction_pool.clone(),
+        backend.offchain_storage().clone().unwrap(),
+    );
+
 	network_starter.start_network();
 	Ok(task_manager)
+}
+
+use centrum_runtime::Runtime;
+use centrum_runtime::SignedPayload;
+use centrum_runtime::opaque::UncheckedExtrinsic;
+use sp_runtime::MultiAddress;
+use sp_runtime::MultiSignature;
+use sp_core::Pair;
+use sp_api::ProvideRuntimeApi;
+use substrate_frame_rpc_system::AccountNonceApi;
+use sp_api::Core;
+use codec::Encode;
+
+pub struct TxCreator;
+impl centrum_mpc_node::types::TransactionCreator<Block, FullClient, pallet_mpc_manager::Call<Runtime>> for TxCreator {
+	fn create_transaction(
+        client: Arc<FullClient>,
+        pair: sp_core::sr25519::Pair,
+        call: pallet_mpc_manager::Call<Runtime>,
+    ) -> (UncheckedExtrinsic, centrum_runtime::Hash) {
+		    let account: centrum_runtime::AccountId = pair.public().into();
+
+    let tip = 0;
+
+    let era = sp_runtime::generic::Era::immortal();
+
+    let runtime_api = client.runtime_api();
+
+    let chain_info = client.chain_info();
+
+    let genesis_hash = chain_info.genesis_hash;
+    let best_hash = chain_info.best_hash;
+
+    let nonce = runtime_api
+        .account_nonce(best_hash, account.clone())
+        .expect("nonce runtime api failed.");
+
+    let version = runtime_api
+        .version(best_hash)
+        .expect("version runtime api failed.");
+
+    let extra: centrum_runtime::SignedExtra = (
+        frame_system::CheckNonZeroSender::<Runtime>::new(),
+        frame_system::CheckSpecVersion::<Runtime>::new(),
+        frame_system::CheckTxVersion::<Runtime>::new(),
+        frame_system::CheckGenesis::<Runtime>::new(),
+        frame_system::CheckEra::<Runtime>::from(era),
+        frame_system::CheckNonce::<Runtime>::from(nonce),
+        frame_system::CheckWeight::<Runtime>::new(),
+        pallet_transaction_payment::ChargeTransactionPayment::<Runtime>::from(tip),
+		frame_metadata_hash_extension::CheckMetadataHash::<Runtime>::new(false),
+    );
+
+    let raw_payload = SignedPayload::from_raw(
+        call.into(),
+        extra,
+        (
+            (),
+            version.spec_version,
+            version.transaction_version,
+            genesis_hash,
+            genesis_hash,
+            (),
+            (),
+            (),
+			None
+        ),
+    );
+
+    let signature = raw_payload.using_encoded(|payload| pair.sign(payload));
+
+    let (call, extra, _) = raw_payload.deconstruct();
+
+    (
+       UncheckedExtrinsic::from_bytes(&centrum_runtime::UncheckedExtrinsic::new_signed(
+            call,
+            MultiAddress::Id(account),
+            MultiSignature::Sr25519(signature),
+            extra,
+        ).encode()).unwrap(),
+        best_hash,
+    )
+	}
 }
