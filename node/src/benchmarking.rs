@@ -154,8 +154,8 @@ pub fn create_benchmark_extrinsic(
 
     runtime::UncheckedExtrinsic::new_signed(
         call,
-        sp_runtime::AccountId32::from(sender.public()).into(),
-        runtime::Signature::Sr25519(signature),
+        centrum_primitives::Account::from(sp_runtime::AccountId32::from(sender.public())).into(),
+        centrum_primitives::CustomSignature::new(sp_runtime::MultiSignature::Sr25519(signature)),
         extra,
     )
 }

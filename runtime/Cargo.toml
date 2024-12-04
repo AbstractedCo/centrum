@@ -17,9 +17,12 @@ targets = ["x86_64-unknown-linux-gnu"]
 pallet-mpc-manager = { workspace = true, default-features = false }
 pallet-mpc-manager-runtime-api = { workspace = true, default-features = false }
 
+centrum-primitives = { workspace = true, default-features = false }
+
+pallet-accounts = { workspace = true }
+
 codec = { features = ["derive"], workspace = true, default-features = false }
 scale-info = { features = ["derive"], workspace = true, default-features = false }
-#getrandom = { workspace = true, default-features = false }
 
 # frame
 frame-support = { features = ["experimental"], workspace = true, default-features = false }
@@ -65,6 +68,10 @@ substrate-wasm-builder = { optional = true, workspace = true, default-features =
 [features]
 default = ["std"]
 std = [
+	"centrum-primitives/std",
+
+	"pallet-accounts/std",
+
 	"codec/std",
 	"scale-info/std",
 
@@ -116,6 +123,7 @@ runtime-benchmarks = [
 	"pallet-sudo/runtime-benchmarks",
 	"pallet-timestamp/runtime-benchmarks",
 	"sp-runtime/runtime-benchmarks",
+	"pallet-accounts/runtime-benchmarks",
 ]
 
 try-runtime = [
@@ -130,6 +138,7 @@ try-runtime = [
 	"pallet-timestamp/try-runtime",
 	"pallet-transaction-payment/try-runtime",
 	"sp-runtime/try-runtime",
+	"pallet-accounts/try-runtime",
 ]
 
 # Enable the metadata hash generation.

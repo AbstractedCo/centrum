@@ -9,11 +9,17 @@ edition = "2021"
 members = [
     "node",
     "runtime",
+    "primitives",
+    "pallets/*"
 ]
+exclude = ["testing"]
 resolver = "2"
 
 [workspace.dependencies]
 centrum-runtime = { path = "./runtime", default-features = false }
+centrum-primitives = { path = "./primitives", default-features = false }
+
+pallet-accounts = { path = "./pallets/accounts", default-features = false }
 
 centrum-mpc-node = { git = "https://github.com/Abstracted-Labs/centrum-mpc" }
 pallet-mpc-manager = { git = "https://github.com/Abstracted-Labs/centrum-mpc", default-features = false }
@@ -25,6 +31,15 @@ futures = { version = "0.3.30" }
 jsonrpsee = { version = "0.23.2" }
 codec = { version = "3.6.12", default-features = false, package = "parity-scale-codec" }
 scale-info = { version = "2.11.1", default-features = false }
+serde = { version = "1.0.145", default-features = false }
+serde_bytes = { version = "0.11.15", default-features = false }
+serde_cbor = { version = "0.11.2", default-features = false }
+serde_with = { version = "3.11.0", default-features = false, features = ["macros"] }
+serde_json = { version = "1.0.114", default-features = false }
+base64 = { version = "0.13.1" }
+
+p256 = { version = "0.13.2", default-features = false, features = ["ecdsa", "alloc"] }
+array-bytes = { version = "6.2.3" }
 
 frame-benchmarking-cli = { version = "42.0.0", default-features = false }
 frame-system = { version = "37.1.0", default-features = false }
@@ -44,7 +59,6 @@ sc-service = { version = "0.45.0", default-features = false }
 sc-telemetry = { version = "24.0.0", default-features = false }
 sc-transaction-pool = { version = "37.0.0", default-features = false }
 sc-transaction-pool-api = { version = "37.0.0", default-features = false }
-serde_json = { version = "1.0.114", default-features = false }
 sp-api = { version = "34.0.0", default-features = false }
 sp-block-builder = { version = "34.0.0", default-features = false }
 sp-blockchain = { version = "37.0.0", default-features = false }
@@ -54,6 +68,7 @@ sp-core = { version = "34.0.0", default-features = false }
 sp-inherents = { version = "34.0.0", default-features = false }
 sp-keyring = { version = "39.0.0", default-features = false }
 sp-runtime = { version = "39.0.0", default-features = false }
+sp-std = { version = "14.0.0", default-features = false }
 sp-timestamp = { version = "34.0.0", default-features = false }
 substrate-frame-rpc-system = { version = "38.0.0", default-features = false }
 substrate-build-script-utils = { version = "11.0.0", default-features = false }

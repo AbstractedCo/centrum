@@ -128,6 +128,7 @@ pub fn new_full<
 	N: sc_network::NetworkBackend<Block, <Block as sp_runtime::traits::Block>::Hash>,
 >(
 	config: Configuration,
+	mpc: bool,
 ) -> Result<TaskManager, ServiceError> {
 	let sc_service::PartialComponents {
 		client,
@@ -344,6 +345,7 @@ pub fn new_full<
 		);
 	}
 
+	if mpc {
 	centrum_mpc_node::start_tss_tasks::<
 			centrum_runtime::AccountId,
 		Block,
@@ -365,6 +367,7 @@ pub fn new_full<
         transaction_pool.clone(),
         backend.offchain_storage().clone().unwrap(),
     );
+	}
 
 	network_starter.start_network();
 	Ok(task_manager)
@@ -445,7 +448,7 @@ impl centrum_mpc_node::types::TransactionCreator<Block, FullClient, pallet_mpc_m
        UncheckedExtrinsic::from_bytes(&centrum_runtime::UncheckedExtrinsic::new_signed(
             call,
             MultiAddress::Id(account),
-            MultiSignature::Sr25519(signature),
+            centrum_primitives::CustomSignature::new(MultiSignature::Sr25519(signature)),
             extra,
         ).encode()).unwrap(),
         best_hash,

@@ -158,7 +158,7 @@ pub fn run() -> sc_cli::Result<()> {
 							Box::new(RemarkBuilder::new(client.clone())),
 							Box::new(TransferKeepAliveBuilder::new(
 								client.clone(),
-								Sr25519Keyring::Alice.to_account_id(),
+								Sr25519Keyring::Alice.to_account_id().into(),
 								EXISTENTIAL_DEPOSIT,
 							)),
 						]);
@@ -183,10 +183,10 @@ pub fn run() -> sc_cli::Result<()> {
 							centrum_runtime::opaque::Block,
 							<centrum_runtime::opaque::Block as sp_runtime::traits::Block>::Hash,
 						>,
-					>(config)
+					>(config, cli.mpc)
 					.map_err(sc_cli::Error::Service),
 					sc_network::config::NetworkBackendType::Litep2p =>
-						service::new_full::<sc_network::Litep2pNetworkBackend>(config)
+						service::new_full::<sc_network::Litep2pNetworkBackend>(config, cli.mpc)
 							.map_err(sc_cli::Error::Service),
 				}
 			})

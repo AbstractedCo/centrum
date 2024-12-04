@@ -23,9 +23,12 @@ type AccountPublic = <Signature as Verify>::Signer;
 /// Generate an account ID from seed.
 pub fn get_account_id_from_seed<TPublic: Public>(seed: &str) -> AccountId
 where
-    AccountPublic: From<<TPublic::Pair as Pair>::Public>,
+    sp_runtime::MultiSigner: From<<TPublic::Pair as Pair>::Public>,
 {
-    AccountPublic::from(get_from_seed::<TPublic>(seed)).into_account()
+    AccountPublic::from(sp_runtime::MultiSigner::from(get_from_seed::<TPublic>(
+        seed,
+    )))
+    .into_account()
 }
 
 /// Generate an Aura authority key.
@@ -52,22 +55,29 @@ pub fn development_config() -> Result<ChainSpec, String> {
             get_account_id_from_seed::<sr25519::Public>("Bob"),
             get_account_id_from_seed::<sr25519::Public>("Alice//stash"),
             get_account_id_from_seed::<sr25519::Public>("Bob//stash"),
-            sr25519::Pair::from_phrase(
-                "result comic satoshi spike awake echo mystery undo mouse fog borrow dash",
-                None,
+            sp_core::crypto::AccountId32::from(
+                sr25519::Pair::from_phrase(
+                    "result comic satoshi spike awake echo mystery undo mouse fog borrow dash",
+                    None,
+                )
+                .unwrap()
+                .0
+                .public(),
             )
-            .unwrap()
-            .0
-            .public()
             .into(),
-            sr25519::Pair::from_phrase(
-                "chat defense bird siren cream bargain absurd ripple lonely gasp thing fit",
-                None,
+            sp_core::crypto::AccountId32::from(
+                sr25519::Pair::from_phrase(
+                    "chat defense bird siren cream bargain absurd ripple lonely gasp thing fit",
+                    None,
+                )
+                .unwrap()
+                .0
+                .public(),
             )
-            .unwrap()
-            .0
-            .public()
             .into(),
+            centrum_primitives::Account::Named(b"test".to_vec().try_into().unwrap()),
+            get_account_id_from_seed::<sp_core::ecdsa::Public>("Alice"),
+            get_account_id_from_seed::<sp_core::ecdsa::Public>("Bob"),
         ],
         true,
     ))

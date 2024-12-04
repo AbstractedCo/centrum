@@ -66,6 +66,7 @@ frame-benchmarking-cli = { workspace = true, default-features = true }
 
 # Local Dependencies
 centrum-runtime = { workspace = true }
+centrum-primitives = { workspace = true, default-features = true }
 
 [build-dependencies]
 substrate-build-script-utils = { workspace = true, default-features = true }
@@ -73,7 +74,7 @@ substrate-build-script-utils = { workspace = true, default-features = true }
 [features]
 default = ["std"]
 std = [
-	"centrum-runtime/std",
+	"centrum-runtime/std"
 ]
 # Dependencies that are only required if runtime benchmarking should be build.
 runtime-benchmarks = [
