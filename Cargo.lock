@@ -1099,6 +1099,7 @@ dependencies = [
 [[package]]
 name = "centrum-mpc-common"
 version = "0.1.0-dev"
+source = "git+https://github.com/Abstracted-Labs/centrum-mpc?branch=francisco-test_git_dependencies_to_make_frontier_work#ae01616e7a0559cb560f2e8005bb852f1c00ca0c"
 dependencies = [
  "cait-sith",
  "elliptic-curve",
@@ -1114,6 +1115,7 @@ dependencies = [
 [[package]]
 name = "centrum-mpc-node"
 version = "0.0.1"
+source = "git+https://github.com/Abstracted-Labs/centrum-mpc?branch=francisco-test_git_dependencies_to_make_frontier_work#ae01616e7a0559cb560f2e8005bb852f1c00ca0c"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -6418,6 +6420,7 @@ dependencies = [
 [[package]]
 name = "pallet-mpc-manager"
 version = "0.1.0-dev"
+source = "git+https://github.com/Abstracted-Labs/centrum-mpc?branch=francisco-test_git_dependencies_to_make_frontier_work#ae01616e7a0559cb560f2e8005bb852f1c00ca0c"
 dependencies = [
  "centrum-mpc-common",
  "elliptic-curve",
@@ -6439,6 +6442,7 @@ dependencies = [
 [[package]]
 name = "pallet-mpc-manager-runtime-api"
 version = "0.1.0-dev"
+source = "git+https://github.com/Abstracted-Labs/centrum-mpc?branch=francisco-test_git_dependencies_to_make_frontier_work#ae01616e7a0559cb560f2e8005bb852f1c00ca0c"
 dependencies = [
  "pallet-mpc-manager",
  "parity-scale-codec",

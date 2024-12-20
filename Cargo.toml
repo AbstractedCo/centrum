@@ -15,9 +15,9 @@ resolver = "2"
 [workspace.dependencies]
 centrum-runtime = { path = "./runtime", default-features = false }
 
-centrum-mpc-node = { path= "../centrum-mpc/node" }
-pallet-mpc-manager = { path= "../centrum-mpc/pallet-mpc-manager", default-features = false }
-pallet-mpc-manager-runtime-api = { path= "../centrum-mpc/pallet-mpc-manager/runtime-api", default-features = false }
+centrum-mpc-node = { git = "https://github.com/Abstracted-Labs/centrum-mpc", branch = "francisco-test_git_dependencies_to_make_frontier_work" }
+pallet-mpc-manager = { git = "https://github.com/Abstracted-Labs/centrum-mpc", branch = "francisco-test_git_dependencies_to_make_frontier_work", default-features = false }
+pallet-mpc-manager-runtime-api = { git = "https://github.com/Abstracted-Labs/centrum-mpc", branch = "francisco-test_git_dependencies_to_make_frontier_work", default-features = false }
 
 async-trait = "0.1"
 clap = { version = "4.5.3" }
