@@ -1,8 +1,10 @@
-use centrum_runtime::{AccountId, Signature, WASM_BINARY};
-use sc_service::ChainType;
+use std::{collections::BTreeMap, str::FromStr};
+
+use centrum_runtime::{configs::SS58Prefix, AccountId, Signature, WASM_BINARY};
+use sc_chain_spec::{ChainType, Properties};
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 use sp_consensus_grandpa::AuthorityId as GrandpaId;
-use sp_core::{sr25519, Pair, Public};
+use sp_core::{sr25519, Pair, Public, H160, U256};
 use sp_runtime::traits::{IdentifyAccount, Verify};
 
 // The URL for the telemetry server.
@@ -33,7 +35,14 @@ pub fn authority_keys_from_seed(s: &str) -> (AuraId, GrandpaId) {
     (get_from_seed::<AuraId>(s), get_from_seed::<GrandpaId>(s))
 }
 
-pub fn development_config() -> Result<ChainSpec, String> {
+fn properties() -> Properties {
+    let mut properties = Properties::new();
+    properties.insert("tokenDecimals".into(), 12.into());
+    properties.insert("ss58Format".into(), SS58Prefix::get().into());
+    properties
+}
+
+pub fn development_config(enable_manual_seal: bool) -> Result<ChainSpec, String> {
     Ok(ChainSpec::builder(
         WASM_BINARY.ok_or_else(|| "Development wasm not available".to_string())?,
         None,
@@ -41,6 +50,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
     .with_name("Development")
     .with_id("dev")
     .with_chain_type(ChainType::Development)
+    .with_properties(properties())
     .with_genesis_config_patch(testnet_genesis(
         // Initial PoA authorities
         vec![authority_keys_from_seed("Alice")],
@@ -70,6 +80,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
             .into(),
         ],
         true,
+        enable_manual_seal,
     ))
     .build())
 }
@@ -82,6 +93,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
     .with_name("Local Testnet")
     .with_id("local_testnet")
     .with_chain_type(ChainType::Local)
+    .with_properties(properties())
     .with_genesis_config_patch(testnet_genesis(
         // Initial PoA authorities
         vec![
@@ -106,6 +118,7 @@ pub fn local_testnet_config() -> Result<ChainSpec, String> {
             get_account_id_from_seed::<sr25519::Public>("Ferdie//stash"),
         ],
         true,
+        false,
     ))
     .build())
 }
@@ -116,7 +129,136 @@ fn testnet_genesis(
     root_key: AccountId,
     endowed_accounts: Vec<AccountId>,
     _enable_println: bool,
+    enable_manual_seal: bool,
 ) -> serde_json::Value {
+    let evm_accounts = {
+        let mut map = BTreeMap::new();
+        // map.insert(
+        //     // H160 address of Alice dev account
+        //     // Derived from SS58 (42 prefix) address
+        //     // SS58: 5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY
+        //     // hex: 0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d
+        //     // Using the full hex key, truncating to the first 20 bytes (the first 40 hex chars)
+        //     H160::from_str("d43593c715fdd31c61141abd04a99fd6822c8558")
+        //         .expect("internal H160 is valid; qed"),
+        //     fp_evm::GenesisAccount {
+        //         balance: U256::from_str("0xffffffffffffffffffffffffffffffff")
+        //             .expect("internal U256 is valid; qed"),
+        //         code: Default::default(),
+        //         nonce: Default::default(),
+        //         storage: Default::default(),
+        //     },
+        // );
+        // map.insert(
+        //     // H160 address of CI test runner account for my personal account
+        //     H160::from_str("f24FF3a9CF04c71Dbc94D0b566f7A27B94566cac")
+        //         .expect("internal H160 is valid; qed"),
+        //     fp_evm::GenesisAccount {
+        //         balance: U256::from_str("0xffffffffffffffffffffffffffffffff")
+        //             .expect("internal U256 is valid; qed"),
+        //         code: Default::default(),
+        //         nonce: Default::default(),
+        //         storage: Default::default(),
+        //     },
+        // );
+        // map.insert(
+        //     // H160 address of CI test runner account for my personal account
+        //     H160::from_str("3Cd0A705a2DC65e5b1E1205896BaA2be8A07c6e0")
+        //         .expect("internal H160 is valid; qed"),
+        //     fp_evm::GenesisAccount {
+        //         balance: U256::from_str("0xffffffffffffffffffffffffffffffff")
+        //             .expect("internal U256 is valid; qed"),
+        //         code: Default::default(),
+        //         nonce: Default::default(),
+        //         storage: Default::default(),
+        //     },
+        // );
+        // map.insert(
+        //     // H160 address of CI test runner account for my personal account
+        //     H160::from_str("798d4Ba9baf0064Ec19eB4F0a1a45785ae9D6DFc")
+        //         .expect("internal H160 is valid; qed"),
+        //     fp_evm::GenesisAccount {
+        //         balance: U256::from_str("0xffffffffffffffffffffffffffffffff")
+        //             .expect("internal U256 is valid; qed"),
+        //         code: Default::default(),
+        //         nonce: Default::default(),
+        //         storage: Default::default(),
+        //     },
+        // );
+        // map.insert(
+        //     // H160 address of CI test runner account for my personal account
+        //     H160::from_str("773539d4Ac0e786233D90A233654ccEE26a613D9")
+        //         .expect("internal H160 is valid; qed"),
+        //     fp_evm::GenesisAccount {
+        //         balance: U256::from_str("0xffffffffffffffffffffffffffffffff")
+        //             .expect("internal U256 is valid; qed"),
+        //         code: Default::default(),
+        //         nonce: Default::default(),
+        //         storage: Default::default(),
+        //     },
+        // );
+        // map.insert(
+        //     // H160 address of CI test runner account for my personal account
+        //     H160::from_str("Ff64d3F6efE2317EE2807d223a0Bdc4c0c49dfDB")
+        //         .expect("internal H160 is valid; qed"),
+        //     fp_evm::GenesisAccount {
+        //         balance: U256::from_str("0xffffffffffffffffffffffffffffffff")
+        //             .expect("internal U256 is valid; qed"),
+        //         code: Default::default(),
+        //         nonce: Default::default(),
+        //         storage: Default::default(),
+        //     },
+        // );
+        // map.insert(
+        //     // H160 address of CI test runner account for my personal account
+        //     H160::from_str("C0F0f4ab324C46e55D02D0033343B4Be8A55532d")
+        //         .expect("internal H160 is valid; qed"),
+        //     fp_evm::GenesisAccount {
+        //         balance: U256::from_str("0xffffffffffffffffffffffffffffffff")
+        //             .expect("internal U256 is valid; qed"),
+        //         code: Default::default(),
+        //         nonce: Default::default(),
+        //         storage: Default::default(),
+        //     },
+        // );
+        // map.insert(
+        //     // H160 address of CI test runner account for my personal account
+        //     H160::from_str("c99F9d2549aa5B2BB5A07cEECe4AFf32a60ceB11")
+        //         .expect("internal H160 is valid; qed"),
+        //     fp_evm::GenesisAccount {
+        //         balance: U256::from_str("0xffffffffffffffffffffffffffffffff")
+        //             .expect("internal U256 is valid; qed"),
+        //         code: Default::default(),
+        //         nonce: Default::default(),
+        //         storage: Default::default(),
+        //     },
+        // );
+        map.insert(
+            // H160 address of CI test runner account
+            H160::from_str("6be02d1d3665660d22ff9624b7be0551ee1ac91b")
+                .expect("internal H160 is valid; qed"),
+            fp_evm::GenesisAccount {
+                balance: U256::from_str("0xffffffffffffffffffffffffffffffff")
+                    .expect("internal U256 is valid; qed"),
+                code: Default::default(),
+                nonce: Default::default(),
+                storage: Default::default(),
+            },
+        );
+        map.insert(
+            // H160 address for benchmark usage
+            H160::from_str("1000000000000000000000000000000000000001")
+                .expect("internal H160 is valid; qed"),
+            fp_evm::GenesisAccount {
+                nonce: U256::from(1),
+                balance: U256::from(1_000_000_000_000_000_000_000_000u128),
+                storage: Default::default(),
+                code: vec![0x00],
+            },
+        );
+        map
+    };
+
     serde_json::json!({
         "balances": {
             // Configure endowed accounts with initial balance of 1 << 60.
@@ -132,5 +274,8 @@ fn testnet_genesis(
             // Assign network admin rights.
             "key": Some(root_key),
         },
+        // "evmChainId": { "chainId": chain_id },
+        "evm": { "accounts": evm_accounts },
+        "manualSeal": { "enable": enable_manual_seal }
     })
 }

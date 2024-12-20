@@ -24,25 +24,39 @@
 // For more information, please refer to <http://unlicense.org>
 
 // Substrate and Polkadot dependencies
+use fp_evm::weight_per_gas;
 use frame_support::{
-    derive_impl, parameter_types,
-    traits::{ConstBool, ConstU128, ConstU32, ConstU64, ConstU8, VariantCountOf},
+    derive_impl,
+    pallet_prelude::PhantomData,
+    parameter_types,
+    traits::{
+        ConstBool, ConstU128, ConstU32, ConstU64, ConstU8, FindAuthor, OnTimestampSet,
+        VariantCountOf,
+    },
     weights::{
         constants::{RocksDbWeight, WEIGHT_REF_TIME_PER_SECOND},
         IdentityFee, Weight,
     },
+    ConsensusEngineId,
 };
 use frame_system::limits::{BlockLength, BlockWeights};
+use pallet_ethereum::PostLogContent;
 use pallet_transaction_payment::{ConstFeeMultiplier, FungibleAdapter, Multiplier};
 use sp_consensus_aura::sr25519::AuthorityId as AuraId;
-use sp_runtime::{traits::One, Perbill};
+use sp_core::{ByteArray, H160, U256};
+use sp_runtime::{
+    traits::{BlakeTwo256, DispatchInfoOf, Dispatchable, One, PostDispatchInfoOf},
+    transaction_validity::{TransactionValidity, TransactionValidityError},
+    Perbill, Permill,
+};
 use sp_version::RuntimeVersion;
 
 // Local module imports
 use super::{
-    AccountId, Aura, Balance, Balances, Block, BlockNumber, Hash, Nonce, PalletInfo, Runtime,
-    RuntimeCall, RuntimeEvent, RuntimeFreezeReason, RuntimeHoldReason, RuntimeOrigin, RuntimeTask,
-    System, EXISTENTIAL_DEPOSIT, SLOT_DURATION, VERSION,
+    precompiles::FrontierPrecompiles, AccountId, Aura, Balance, Balances, BaseFee, Block,
+    BlockNumber, Hash, Nonce, PalletInfo, Runtime, RuntimeCall, RuntimeEvent, RuntimeFreezeReason,
+    RuntimeHoldReason, RuntimeOrigin, RuntimeTask, System, Timestamp, EXISTENTIAL_DEPOSIT,
+    SLOT_DURATION, VERSION,
 };
 
 const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
@@ -113,7 +127,7 @@ impl pallet_grandpa::Config for Runtime {
 impl pallet_timestamp::Config for Runtime {
     /// A timestamp: milliseconds since the unix epoch.
     type Moment = u64;
-    type OnTimestampSet = Aura;
+    type OnTimestampSet = ConsensusOnTimestampSet<Self>;
     type MinimumPeriod = ConstU64<{ SLOT_DURATION / 2 }>;
     type WeightInfo = ();
 }
@@ -157,4 +171,222 @@ impl pallet_sudo::Config for Runtime {
 
 impl pallet_mpc_manager::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
+}
+
+// #[derive(Clone)]
+// pub struct TransactionConverter<B>(PhantomData<B>);
+
+// impl<B> Default for TransactionConverter<B> {
+//     fn default() -> Self {
+//         Self(PhantomData)
+//     }
+// }
+
+// impl<B: BlockT> fp_rpc::ConvertTransaction<<B as BlockT>::Extrinsic> for TransactionConverter<B> {
+//     fn convert_transaction(
+//         &self,
+//         transaction: pallet_ethereum::Transaction,
+//     ) -> <B as BlockT>::Extrinsic {
+//         let extrinsic = UncheckedExtrinsic::new_unsigned(
+//             pallet_ethereum::Call::<Runtime>::transact { transaction }.into(),
+//         );
+//         let encoded = extrinsic.encode();
+//         <B as BlockT>::Extrinsic::decode(&mut &encoded[..])
+//             .expect("Encoded extrinsic is always valid")
+//     }
+// }
+
+impl fp_self_contained::SelfContainedCall for RuntimeCall {
+    type SignedInfo = H160;
+
+    fn is_self_contained(&self) -> bool {
+        match self {
+            RuntimeCall::Ethereum(call) => call.is_self_contained(),
+            _ => false,
+        }
+    }
+
+    fn check_self_contained(&self) -> Option<Result<Self::SignedInfo, TransactionValidityError>> {
+        match self {
+            RuntimeCall::Ethereum(call) => call.check_self_contained(),
+            _ => None,
+        }
+    }
+
+    fn validate_self_contained(
+        &self,
+        info: &Self::SignedInfo,
+        dispatch_info: &DispatchInfoOf<RuntimeCall>,
+        len: usize,
+    ) -> Option<TransactionValidity> {
+        match self {
+            RuntimeCall::Ethereum(call) => call.validate_self_contained(info, dispatch_info, len),
+            _ => None,
+        }
+    }
+
+    fn pre_dispatch_self_contained(
+        &self,
+        info: &Self::SignedInfo,
+        dispatch_info: &DispatchInfoOf<RuntimeCall>,
+        len: usize,
+    ) -> Option<Result<(), TransactionValidityError>> {
+        match self {
+            RuntimeCall::Ethereum(call) => {
+                call.pre_dispatch_self_contained(info, dispatch_info, len)
+            }
+            _ => None,
+        }
+    }
+
+    fn apply_self_contained(
+        self,
+        info: Self::SignedInfo,
+    ) -> Option<sp_runtime::DispatchResultWithInfo<PostDispatchInfoOf<Self>>> {
+        match self {
+            call @ RuntimeCall::Ethereum(pallet_ethereum::Call::transact { .. }) => {
+                Some(call.dispatch(RuntimeOrigin::from(
+                    pallet_ethereum::RawOrigin::EthereumTransaction(info),
+                )))
+            }
+            _ => None,
+        }
+    }
+}
+
+parameter_types! {
+    pub storage EnableManualSeal: bool = false;
+}
+
+pub struct ConsensusOnTimestampSet<T>(PhantomData<T>);
+impl<T: pallet_aura::Config> OnTimestampSet<T::Moment> for ConsensusOnTimestampSet<T> {
+    fn on_timestamp_set(moment: T::Moment) {
+        if EnableManualSeal::get() {
+            return;
+        }
+        <pallet_aura::Pallet<T> as OnTimestampSet<T::Moment>>::on_timestamp_set(moment)
+    }
+}
+
+#[frame_support::pallet]
+pub mod pallet_manual_seal {
+    use super::*;
+    use frame_support::pallet_prelude::*;
+
+    #[pallet::pallet]
+    pub struct Pallet<T>(PhantomData<T>);
+
+    #[pallet::config]
+    pub trait Config: frame_system::Config {}
+
+    #[pallet::genesis_config]
+    #[derive(frame_support::DefaultNoBound)]
+    pub struct GenesisConfig<T> {
+        pub enable: bool,
+        #[serde(skip)]
+        pub _config: PhantomData<T>,
+    }
+
+    #[pallet::genesis_build]
+    impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
+        fn build(&self) {
+            EnableManualSeal::set(&self.enable);
+        }
+    }
+}
+
+impl pallet_manual_seal::Config for Runtime {}
+
+pub struct FindAuthorTruncated<F>(PhantomData<F>);
+impl<F: FindAuthor<u32>> FindAuthor<H160> for FindAuthorTruncated<F> {
+    fn find_author<'a, I>(digests: I) -> Option<H160>
+    where
+        I: 'a + IntoIterator<Item = (ConsensusEngineId, &'a [u8])>,
+    {
+        if let Some(author_index) = F::find_author(digests) {
+            let authority_id =
+                pallet_aura::Authorities::<Runtime>::get()[author_index as usize].clone();
+            return Some(H160::from_slice(&authority_id.to_raw_vec()[4..24]));
+        }
+        None
+    }
+}
+
+const BLOCK_GAS_LIMIT: u64 = 75000000;
+const MAX_POV_SIZE: u64 = 5 * 1024 * 1024;
+
+parameter_types! {
+    pub BlockGasLimit: U256 = U256::from(BLOCK_GAS_LIMIT);
+    pub const GasLimitPovSizeRatio: u64 = BLOCK_GAS_LIMIT.saturating_div(MAX_POV_SIZE) + 1u64;
+    pub PrecompilesValue: FrontierPrecompiles<Runtime> = FrontierPrecompiles::<_>::new();
+    pub WeightPerGas: Weight = Weight::from_parts(weight_per_gas(BLOCK_GAS_LIMIT, NORMAL_DISPATCH_RATIO, 2000), 0);
+    pub SuicideQuickClearLimit: u32 = 0;
+    pub const ChainId: u64 = SS58Prefix::get() as u64;
+}
+
+impl pallet_evm::Config for Runtime {
+    type FeeCalculator = BaseFee;
+    type GasWeightMapping = pallet_evm::FixedGasWeightMapping<Self>;
+    type WeightPerGas = WeightPerGas;
+    type BlockHashMapping = pallet_ethereum::EthereumBlockHashMapping<Runtime>;
+    type CallOrigin = pallet_evm::EnsureAddressTruncated;
+    type WithdrawOrigin = pallet_evm::EnsureAddressTruncated;
+    type AddressMapping = pallet_evm::HashedAddressMapping<BlakeTwo256>;
+    type Currency = Balances;
+    type RuntimeEvent = RuntimeEvent;
+    type PrecompilesType = FrontierPrecompiles<Self>;
+    type PrecompilesValue = PrecompilesValue;
+    type ChainId = ChainId;
+    type BlockGasLimit = BlockGasLimit;
+    type Runner = pallet_evm::runner::stack::Runner<Self>;
+    type OnChargeTransaction = ();
+    type OnCreate = ();
+    type FindAuthor = FindAuthorTruncated<Aura>;
+    type GasLimitPovSizeRatio = GasLimitPovSizeRatio;
+    type SuicideQuickClearLimit = SuicideQuickClearLimit;
+    type Timestamp = Timestamp;
+    type WeightInfo = pallet_evm::weights::SubstrateWeight<Self>;
+}
+
+parameter_types! {
+    pub const PostBlockAndTxnHashes: PostLogContent = PostLogContent::BlockAndTxnHashes;
+}
+
+impl pallet_ethereum::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type StateRoot = pallet_ethereum::IntermediateStateRoot<Self>;
+    type PostLogContent = PostBlockAndTxnHashes;
+    type ExtraDataLength = ConstU32<30>;
+}
+
+parameter_types! {
+    pub BoundDivision: U256 = U256::from(1024);
+}
+
+impl pallet_dynamic_fee::Config for Runtime {
+    type MinGasPriceBoundDivisor = BoundDivision;
+}
+
+parameter_types! {
+    pub DefaultBaseFeePerGas: U256 = U256::from(1_000_000_000);
+    pub DefaultElasticity: Permill = Permill::from_parts(125_000);
+}
+
+pub struct BaseFeeThreshold;
+impl pallet_base_fee::BaseFeeThreshold for BaseFeeThreshold {
+    fn lower() -> Permill {
+        Permill::zero()
+    }
+    fn ideal() -> Permill {
+        Permill::from_parts(500_000)
+    }
+    fn upper() -> Permill {
+        Permill::from_parts(1_000_000)
+    }
+}
+impl pallet_base_fee::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type Threshold = BaseFeeThreshold;
+    type DefaultBaseFeePerGas = DefaultBaseFeePerGas;
+    type DefaultElasticity = DefaultElasticity;
 }

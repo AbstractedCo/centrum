@@ -8,6 +8,8 @@ pub mod apis;
 mod benchmarks;
 pub mod configs;
 
+mod precompiles;
+
 extern crate alloc;
 use alloc::vec::Vec;
 use sp_runtime::{
@@ -19,6 +21,7 @@ use sp_runtime::{
 use sp_version::NativeVersion;
 use sp_version::RuntimeVersion;
 
+pub use configs::pallet_manual_seal;
 pub use frame_system::Call as SystemCall;
 pub use pallet_balances::Call as BalancesCall;
 pub use pallet_timestamp::Call as TimestampCall;
@@ -59,8 +62,8 @@ impl_opaque_keys! {
 // https://docs.substrate.io/main-docs/build/upgrade#runtime-versioning
 #[sp_version::runtime_version]
 pub const VERSION: RuntimeVersion = RuntimeVersion {
-    spec_name: create_runtime_str!("solochain-template-runtime"),
-    impl_name: create_runtime_str!("solochain-template-runtime"),
+    spec_name: create_runtime_str!("centrum"),
+    impl_name: create_runtime_str!("centrum"),
     authoring_version: 1,
     // The version of the runtime specification. A full node will not attempt to use its native
     //   runtime in substitute for the on-chain Wasm runtime unless all of `spec_name`,
@@ -162,7 +165,7 @@ pub type SignedExtra = (
 
 /// Unchecked extrinsic type as expected by this runtime.
 pub type UncheckedExtrinsic =
-    generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, SignedExtra>;
+    fp_self_contained::UncheckedExtrinsic<Address, RuntimeCall, Signature, SignedExtra>;
 
 /// The payload being signed in transactions.
 pub type SignedPayload = generic::SignedPayload<RuntimeCall, SignedExtra>;
@@ -220,6 +223,18 @@ mod runtime {
 
     #[runtime::pallet_index(6)]
     pub type Sudo = pallet_sudo;
+
+    #[runtime::pallet_index(7)]
+    pub type Ethereum = pallet_ethereum;
+
+    #[runtime::pallet_index(8)]
+    pub type EVM = pallet_evm;
+
+    #[runtime::pallet_index(9)]
+    pub type BaseFee = pallet_base_fee;
+
+    #[runtime::pallet_index(10)]
+    pub type ManualSeal = pallet_manual_seal;
 
     #[runtime::pallet_index(50)]
     pub type MpcManager = pallet_mpc_manager;
