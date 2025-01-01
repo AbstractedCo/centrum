@@ -38,7 +38,7 @@ jobs:
         run: rustup target list --installed
 
       - name: Build Centrum
-        run: cargo build --release --locked
+        run: cargo build --release
 
       - name: Clone frontier tests
         run: git clone https://github.com/Abstracted-Labs/frontier-tests.git --depth 1
