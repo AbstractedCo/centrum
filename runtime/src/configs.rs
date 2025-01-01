@@ -173,29 +173,6 @@ impl pallet_mpc_manager::Config for Runtime {
     type RuntimeEvent = RuntimeEvent;
 }
 
-// #[derive(Clone)]
-// pub struct TransactionConverter<B>(PhantomData<B>);
-
-// impl<B> Default for TransactionConverter<B> {
-//     fn default() -> Self {
-//         Self(PhantomData)
-//     }
-// }
-
-// impl<B: BlockT> fp_rpc::ConvertTransaction<<B as BlockT>::Extrinsic> for TransactionConverter<B> {
-//     fn convert_transaction(
-//         &self,
-//         transaction: pallet_ethereum::Transaction,
-//     ) -> <B as BlockT>::Extrinsic {
-//         let extrinsic = UncheckedExtrinsic::new_unsigned(
-//             pallet_ethereum::Call::<Runtime>::transact { transaction }.into(),
-//         );
-//         let encoded = extrinsic.encode();
-//         <B as BlockT>::Extrinsic::decode(&mut &encoded[..])
-//             .expect("Encoded extrinsic is always valid")
-//     }
-// }
-
 impl fp_self_contained::SelfContainedCall for RuntimeCall {
     type SignedInfo = H160;
 

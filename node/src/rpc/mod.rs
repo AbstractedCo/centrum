@@ -50,7 +50,7 @@ where
 {
     type EstimateGasAdapter = ();
     type RuntimeStorageOverride =
-        fc_rpc::frontier_backend_client::SystemAccountId20StorageOverride<B, C, BE>;
+        fc_rpc::frontier_backend_client::SystemAccountId32StorageOverride<B, C, BE>;
 }
 
 /// Instantiate all Full RPC extensions.
