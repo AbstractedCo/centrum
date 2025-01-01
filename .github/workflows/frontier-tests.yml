@@ -1,8 +1,5 @@
 name: Frontier RPC Tests
 
-permissions:
-  contents: read
-
 on:
   workflow_dispatch:
   push:
@@ -15,6 +12,8 @@ concurrency:
 jobs:
   tests:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read 
     steps:
       - name: Checkout the source code
         uses: actions/checkout@v4
@@ -22,6 +21,12 @@ jobs:
       - name: Configure git for Cargo
         run: |
           git config --global url."https://${{ secrets.GITHUB_TOKEN }}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
+
+      - name: Configure Cargo
+        run: |
+          mkdir -p .cargo
+          echo '[net]' >> .cargo/config.toml
+          echo 'git-fetch-with-cli = true' >> .cargo/config.toml
 
       - name: Install deps
         run: sudo apt -y install protobuf-compiler
