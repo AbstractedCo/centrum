@@ -18,9 +18,13 @@ jobs:
       - name: Checkout the source code
         uses: actions/checkout@v4
 
-      - name: Configure git for Cargo
+      - name: Configure Git for Cargo
         run: |
+          # Use token for https://
           git config --global url."https://${{ secrets.GITHUB_TOKEN }}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
+          # Also replace git@github.com: with https://
+          git config --global url."https://${{ secrets.GITHUB_TOKEN }}:x-oauth-basic@github.com/".insteadOf "git@github.com:"
+      
 
       - name: Configure Cargo
         run: |
