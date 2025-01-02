@@ -30,13 +30,6 @@ jobs:
       - name: Check targets are installed correctly
         run: rustup target list --installed
 
-      - name: Configure Git for Cargo
-        run: |
-          # Use token for https://
-          git config --global url."https://${{ secrets.GITHUB_TOKEN }}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
-          # Also replace git@github.com: with https://
-          git config --global url."https://${{ secrets.GITHUB_TOKEN }}:x-oauth-basic@github.com/".insteadOf "git@github.com:"
-
       - name: Configure Cargo
         run: |
           mkdir -p .cargo
