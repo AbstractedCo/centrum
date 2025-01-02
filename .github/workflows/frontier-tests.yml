@@ -41,7 +41,7 @@ jobs:
         run: |
           mkdir -p .cargo
           echo '[net]' >> .cargo/config.toml
-          # echo 'git-fetch-with-cli = true' >> .cargo/config.toml
+          echo 'git-fetch-with-cli = true' >> .cargo/config.toml
 
       - name: Build Centrum
         run: cargo build --release
