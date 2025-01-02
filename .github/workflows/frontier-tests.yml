@@ -21,6 +21,12 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           persist-credentials: true
 
+      - name: Configure global git credentials
+        run: |
+          git config --global credential.helper store
+          echo "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com" > ~/.git-credentials
+          git config --global url."https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/".insteadOf "https://github.com/"
+
       - name: Install deps
         run: sudo apt -y install protobuf-compiler
 
@@ -32,9 +38,9 @@ jobs:
 
       - name: Configure Cargo
         run: |
-          mkdir -p .cargo
-          echo '[net]' >> .cargo/config.toml
-          echo 'git-fetch-with-cli = true' >> .cargo/config.toml
+          mkdir -p ~/.cargo
+          echo '[net]' >> ~/.cargo/config.toml
+          echo 'git-fetch-with-cli = true' >> ~/.cargo/config.toml
 
       - name: Build Centrum
         run: cargo build --release
