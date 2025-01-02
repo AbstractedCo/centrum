@@ -15,22 +15,11 @@ jobs:
     permissions:
       contents: read 
     steps:
-      - name: Checkout the source code
+      - name: Check out the source code
         uses: actions/checkout@v4
-
-      - name: Configure Git for Cargo
-        run: |
-          # Use token for https://
-          git config --global url."https://${{ secrets.GITHUB_TOKEN }}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
-          # Also replace git@github.com: with https://
-          git config --global url."https://${{ secrets.GITHUB_TOKEN }}:x-oauth-basic@github.com/".insteadOf "git@github.com:"
-      
-
-      - name: Configure Cargo
-        run: |
-          mkdir -p .cargo
-          echo '[net]' >> .cargo/config.toml
-          echo 'git-fetch-with-cli = true' >> .cargo/config.toml
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: true
 
       - name: Install deps
         run: sudo apt -y install protobuf-compiler
@@ -40,6 +29,19 @@ jobs:
 
       - name: Check targets are installed correctly
         run: rustup target list --installed
+
+      - name: Configure Git for Cargo
+        run: |
+          # Use token for https://
+          git config --global url."https://${{ secrets.GITHUB_TOKEN }}:x-oauth-basic@github.com/".insteadOf "https://github.com/"
+          # Also replace git@github.com: with https://
+          git config --global url."https://${{ secrets.GITHUB_TOKEN }}:x-oauth-basic@github.com/".insteadOf "git@github.com:"
+
+      - name: Configure Cargo
+        run: |
+          mkdir -p .cargo
+          echo '[net]' >> .cargo/config.toml
+          # echo 'git-fetch-with-cli = true' >> .cargo/config.toml
 
       - name: Build Centrum
         run: cargo build --release
