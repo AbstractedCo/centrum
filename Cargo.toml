@@ -36,7 +36,7 @@ serde_bytes = { version = "0.11.15", default-features = false }
 serde_cbor = { version = "0.11.2", default-features = false }
 serde_with = { version = "3.11.0", default-features = false, features = ["macros"] }
 serde_json = { version = "1.0.114", default-features = false }
-base64 = { version = "0.13.1" }
+base64 = { version = "0.13.1", default-features = false }
 
 p256 = { version = "0.13.2", default-features = false, features = ["ecdsa", "alloc"] }
 array-bytes = { version = "6.2.3" }
