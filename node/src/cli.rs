@@ -7,8 +7,7 @@ pub struct Cli {
 
     #[clap(flatten)]
     pub run: RunCmd,
-
-    pub mpc: bool,
+    // pub mpc: bool,
 }
 
 #[derive(Debug, clap::Subcommand)]

@@ -28,6 +28,7 @@ sp-core = { workspace = true }
 [features]
 default = ["std"]
 std = [
+    "centrum-primitives/std",
     "codec/std",
     "frame-benchmarking?/std",
     "frame-support/std",
