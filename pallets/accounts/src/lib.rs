@@ -3,7 +3,7 @@
 extern crate alloc;
 
 use alloc::vec::Vec;
-use centrum_primitives::Account;
+use centrum_primitives::{Account, AccountId32OrEcdsa33};
 use codec::{Decode, Encode, MaxEncodedLen};
 use frame_support::pallet_prelude::ConstU32;
 use frame_support::{dispatch::DispatchResult, IterableStorageDoubleMap};
@@ -40,7 +40,7 @@ pub mod pallet {
         Blake2_128Concat,
         BoundedVec<u8, ConstU32<32>>,
         Twox64Concat,
-        AccountId32,
+        AccountId32OrEcdsa33,
         Permissions,
     >;
 
@@ -49,12 +49,12 @@ pub mod pallet {
     pub enum Event<T: Config> {
         AccountCreated {
             name: Vec<u8>,
-            signer: AccountId32,
+            signer: AccountId32OrEcdsa33,
         },
 
         SignerAdded {
             account: Vec<u8>,
-            signer: AccountId32,
+            signer: AccountId32OrEcdsa33,
         },
     }
 
@@ -70,7 +70,7 @@ pub mod pallet {
         pub fn create_account(
             origin: OriginFor<T>,
             name: Vec<u8>,
-            public_key: AccountId32,
+            public_key: AccountId32OrEcdsa33,
         ) -> DispatchResult {
             ensure_signed(origin)?;
 
@@ -93,7 +93,10 @@ pub mod pallet {
 
         #[pallet::call_index(1)]
         #[pallet::weight(1)]
-        pub fn add_signer(origin: OriginFor<T>, public_key: AccountId32) -> DispatchResult {
+        pub fn add_signer(
+            origin: OriginFor<T>,
+            public_key: AccountId32OrEcdsa33,
+        ) -> DispatchResult {
             let account = ensure_signed(origin)?;
             let name = ensure_named(account)?;
 
@@ -115,13 +118,15 @@ pub mod pallet {
 
 #[allow(dead_code)]
 impl<T: Config> Pallet<T> {
-    pub fn get_signers_for_account(name: BoundedVec<u8, ConstU32<32>>) -> Vec<AccountId32> {
+    pub fn get_signers_for_account(
+        name: BoundedVec<u8, ConstU32<32>>,
+    ) -> Vec<AccountId32OrEcdsa33> {
         NamedAccountSigners::<T>::iter_key_prefix(name).collect()
     }
 
     pub fn is_signer_for_account(
         name: BoundedVec<u8, ConstU32<32>>,
-        public_key: AccountId32,
+        public_key: AccountId32OrEcdsa33,
     ) -> bool {
         NamedAccountSigners::<T>::contains_key(name, public_key)
     }

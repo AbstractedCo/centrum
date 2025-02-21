@@ -10,11 +10,10 @@ use frame_support::pallet_prelude::MaxEncodedLen;
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_core::crypto::AccountId32;
-use sp_core::crypto_bytes::SignatureBytes;
 use sp_core::ConstU32;
 use sp_runtime::BoundedVec;
 use sp_runtime::{traits::Verify, MultiSignature, MultiSigner, Vec};
-use webauthn::WebAuthnSignature;
+use webauthn::AuthenticatorAssertionResponseRaw;
 
 #[derive(
     Clone,
@@ -68,27 +67,13 @@ impl From<sp_core::sr25519::Public> for Account {
 pub struct CustomSigner {
     pub signer: MultiSigner,
     pub sign_for: Option<BoundedVec<u8, ConstU32<32>>>,
-    //  marker: PhantomData<SignersGetter>,
 }
-
-// impl<SignersGetter> CustomSigner<SignersGetter>
-// where
-//     SignersGetter: GetNamedAccountSigners,
-// {
-//     fn is_signer_for_named_account(
-//         name: BoundedVec<u8, ConstU32<32>>,
-//         public_key: AccountId32,
-//     ) -> bool {
-//         SignersGetter::is_signer_for_named_account(name, public_key)
-//     }
-// }
 
 impl From<MultiSigner> for CustomSigner {
     fn from(signer: MultiSigner) -> Self {
         Self {
             signer,
             sign_for: None,
-            //  marker: PhantomData,
         }
     }
 }
@@ -104,45 +89,29 @@ impl sp_runtime::traits::IdentifyAccount for CustomSigner {
 }
 
 pub trait GetNamedAccountSigners {
-    fn get_named_account_signers(name: BoundedVec<u8, ConstU32<32>>) -> Vec<AccountId32>;
+    fn get_named_account_signers(name: BoundedVec<u8, ConstU32<32>>) -> Vec<AccountId32OrEcdsa33>;
     fn is_signer_for_named_account(
         name: BoundedVec<u8, ConstU32<32>>,
-        public_key: AccountId32,
+        public_key: AccountId32OrEcdsa33,
     ) -> bool;
 }
 
-#[derive(
-    Eq, PartialEq, Clone, Encode, Decode, Debug, TypeInfo, Serialize, Deserialize, MaxEncodedLen,
-)]
+#[derive(Eq, PartialEq, Clone, Encode, Decode, Debug, TypeInfo, Serialize, Deserialize)]
 pub enum MultiSignatureOrPasskeySignature {
     MultiSignature(MultiSignature),
-    PasskeySignature(WebAuthnSignature),
+    PasskeySignature(AuthenticatorAssertionResponseRaw),
 }
 
-pub fn secp256r1_ecdsa_recover_compressed(
-    sig: &[u8; 65],
-    msg: &[u8; 32],
-) -> Result<[u8; 33], sp_io::EcdsaVerifyError> {
-    let recovery_id: u8 = if sig[64] > 26 { sig[64] - 27 } else { sig[64] } as u8;
-
-    let signature = p256::ecdsa::Signature::from_bytes(sig[..64].into()).unwrap();
-
-    let pubkey = p256::ecdsa::VerifyingKey::recover_from_prehash(
-        msg,
-        &signature,
-        recovery_id.try_into().unwrap(),
-    )
-    .map_err(|_| sp_io::EcdsaVerifyError::BadSignature)?;
-
-    Ok((*pubkey.to_sec1_bytes()).try_into().unwrap())
+#[derive(Eq, PartialEq, Clone, Encode, Decode, Debug, TypeInfo, MaxEncodedLen)]
+pub enum AccountId32OrEcdsa33 {
+    AccountId32(AccountId32),
+    Ecdsa33([u8; 33]),
 }
 
-#[derive(
-    Eq, PartialEq, Clone, Encode, Decode, Debug, TypeInfo, Serialize, Deserialize, MaxEncodedLen,
-)]
+#[derive(Eq, PartialEq, Clone, Encode, Decode, Debug, TypeInfo)]
 pub struct CustomSignature<SignersGetter> {
     pub signature: MultiSignatureOrPasskeySignature,
-    pub signer: Option<AccountId32>,
+    pub signer: Option<AccountId32OrEcdsa33>,
 
     marker: PhantomData<SignersGetter>,
 }
@@ -159,7 +128,7 @@ impl<SignersGetter> CustomSignature<SignersGetter> {
 
     pub fn new_with_signer(
         signature: MultiSignatureOrPasskeySignature,
-        signer: AccountId32,
+        signer: AccountId32OrEcdsa33,
     ) -> Self {
         Self {
             signature,
@@ -189,15 +158,27 @@ where
                     // Search for signer in list of public keys.
                     if SignersGetter::is_signer_for_named_account(name.clone(), key.clone()) {
                         // Verify signature against found signer.
-                        match s {
-                            MultiSignatureOrPasskeySignature::MultiSignature(sig) => {
-                                sig.verify(msg, &key)
-                            }
-                            MultiSignatureOrPasskeySignature::PasskeySignature(webauthn_sig) => {
-                                let who: [u8; 32] = *key.as_ref();
+                        match (s, key) {
+                            (
+                                MultiSignatureOrPasskeySignature::MultiSignature(sig),
+                                AccountId32OrEcdsa33::AccountId32(key),
+                            ) => sig.verify(msg, &key),
+                            (
+                                MultiSignatureOrPasskeySignature::PasskeySignature(webauthn_data),
+                                AccountId32OrEcdsa33::Ecdsa33(key),
+                            ) => {
+                                let encoded_point = p256::EncodedPoint::from_bytes(&key).unwrap();
 
-                                webauthn_sig.verify(msg.get(), who).is_ok()
+                                let verifying_key =
+                                    p256::ecdsa::VerifyingKey::from_encoded_point(&encoded_point)
+                                        .unwrap();
+
+                                webauthn_data
+                                    .verify(msg.get(), &verifying_key.to_sec1_bytes())
+                                    .is_ok()
                             }
+
+                            _ => false,
                         }
                     } else {
                         false

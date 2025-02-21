@@ -12,15 +12,16 @@ publish = false
 [dependencies]
 serde = { workspace = true, features = ["alloc", "derive"] }
 serde_bytes = { workspace = true, features = ["alloc"] }
-serde_cbor = { workspace = true, features = ["alloc"] }
+#serde_cbor = { workspace = true, features = ["alloc"] }
 serde_with = { workspace = true }
 serde_json = { workspace = true }
 base64 = { workspace = true, features = ["alloc"] }
 codec = { package = "parity-scale-codec", workspace = true, features = ["max-encoded-len"] }
 scale-info = { workspace = true, features = ["derive"] }
+#base64urlsafedata = { workspace = true }
 
 sp-core = { workspace = true }
-sp-io = { workspace = true }
+#sp-io = { workspace = true }
 sp-runtime = { workspace = true }
 sp-std = { workspace = true }
 frame-support = { workspace = true }
@@ -34,14 +35,15 @@ std = [
     "serde/std",
     "serde_json/std",
     "serde_bytes/std",
-    "serde_cbor/std",
+ #   "serde_cbor/std",
     "serde_with/std",
     "base64/std",
     "codec/std",
     "scale-info/std",
     "sp-runtime/std",
     "sp-core/std",
-    "sp-io/std",
+  #  "sp-io/std",
     "sp-std/std",
-    "frame-support/std"
+    "frame-support/std",
+    "p256/std"
 ]

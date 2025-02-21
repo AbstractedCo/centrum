@@ -1,131 +1,73 @@
 use codec::{Decode, Encode, MaxEncodedLen};
 use p256::ecdsa::signature::Verifier;
+use p256::pkcs8::DecodePublicKey;
 use scale_info::TypeInfo;
-use serde::{Deserialize, Serialize};
+use serde::{de::Error, Deserialize, Serialize};
 use sp_core::sha2_256;
 use sp_std::vec::Vec;
 
 #[derive(Clone, Eq, PartialEq, Debug, Serialize, Deserialize, Encode, Decode, TypeInfo)]
 struct ClientData {
-    r#type: Vec<u8>,
+    #[serde(deserialize_with = "decode_base64")]
     challenge: Vec<u8>,
-    origin: Vec<u8>,
+    //  origin: Vec<u8>,
 }
 
-#[derive(Eq, PartialEq, Clone, Encode, Decode, Debug, TypeInfo, Serialize, Deserialize)]
-pub struct WebAuthnData {
-    authenticator_data: Vec<u8>,
-    client_data_json: Vec<u8>,
-    client_data: ClientData,
-    signed_bytes: Vec<u8>,
-    challenge: Vec<u8>,
+fn decode_base64<'de, D>(deserializer: D) -> Result<Vec<u8>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let s: &str = Deserialize::deserialize(deserializer)?;
+
+    base64::decode_config(s, base64::URL_SAFE_NO_PAD).map_err(|e| D::Error::custom(e))
 }
 
-impl WebAuthnData {
-    pub fn challenge(&self) -> Vec<u8> {
-        self.challenge.clone()
-    }
+#[derive(Debug, Deserialize, Serialize, Clone, Encode, Decode, TypeInfo, PartialEq, Eq)]
+pub struct AuthenticatorAssertionResponseRaw {
+    /// Raw authenticator data.
+    #[serde(rename = "authenticatorData")]
+    pub authenticator_data: Vec<u8>,
+
+    /// Signed client data.
+    #[serde(rename = "clientDataJSON")]
+    pub client_data_json: Vec<u8>,
+
+    /// Signature
+    pub signature: Vec<u8>,
+
+    /// Optional userhandle.
+    #[serde(rename = "userHandle")]
+    pub user_handle: Option<Vec<u8>>,
 }
 
-impl TryFrom<&WebAuthnSignature> for WebAuthnData {
-    type Error = ();
+impl AuthenticatorAssertionResponseRaw {
+    pub fn get_signed_data(&self) -> Vec<u8> {
+        let client_data: Vec<u8> = self.client_data_json.clone().into();
+        let client_data_hash = sha2_256(&client_data);
 
-    fn try_from(signature: &WebAuthnSignature) -> Result<Self, Self::Error> {
-        let client_data: ClientData =
-            match serde_json::from_slice(&signature.client_data_json.0[..]) {
-                Ok(client_data) => client_data,
-                // Err(err) => return Err(format!("ClientDataJSON parsing failed with: {}", err)),
-                Err(err) => return Err(()),
-            };
+        let auth_data: Vec<u8> = self.authenticator_data.clone().into();
 
-        let challenge = match base64::decode_config(&client_data.challenge, base64::URL_SAFE_NO_PAD)
-        {
-            Ok(challenge) => challenge,
-            // Err(err) => return Err(format!("Challenge base64url parsing failed with: {}", err)),
-            Err(err) => return Err(()),
-        };
+        let signed_data: Vec<u8> = auth_data
+            .iter()
+            .chain(client_data_hash.iter())
+            .copied()
+            .collect();
 
-        let mut signed_bytes = signature.authenticator_data.0.clone();
-        signed_bytes.append(&mut sha2_256(&signature.client_data_json.0.clone()[..]).to_vec());
-
-        Ok(WebAuthnData {
-            client_data_json: signature.client_data_json.0.clone(),
-            authenticator_data: signature.authenticator_data.0.clone(),
-            client_data,
-            signed_bytes,
-            challenge,
-        })
-    }
-}
-
-#[derive(
-    Clone, Eq, PartialEq, Hash, Default, Deserialize, Serialize, Debug, Encode, Decode, TypeInfo,
-)]
-pub struct Blob(#[serde(with = "serde_bytes")] pub Vec<u8>);
-
-#[derive(Clone, Eq, PartialEq, Hash, Debug, Deserialize, Serialize, Encode, Decode, TypeInfo)]
-pub struct WebAuthnSignature {
-    authenticator_data: Blob,
-    client_data_json: Blob,
-    signature: Blob,
-}
-
-// TODO: Implement this properly.
-impl MaxEncodedLen for WebAuthnSignature {
-    fn max_encoded_len() -> usize {
-        usize::MAX
-    }
-}
-
-impl WebAuthnSignature {
-    pub fn new(authenticator_data: Blob, client_data_json: Blob, signature: Blob) -> Self {
-        Self {
-            authenticator_data,
-            client_data_json,
-            signature,
-        }
+        return signed_data;
     }
 
-    pub fn authenticator_data(&self) -> Blob {
-        self.authenticator_data.clone()
-    }
+    pub fn verify(&self, tx_payload: &[u8], public_key: &[u8]) -> Result<(), ()> {
+        let signature: Vec<u8> = self.signature.clone().into();
 
-    pub fn client_data_json(&self) -> Blob {
-        self.client_data_json.clone()
-    }
+        let data = self.get_signed_data();
 
-    pub fn signature(&self) -> Blob {
-        self.signature.clone()
-    }
+        p256_verify_signature_with_pubkey(&signature, &data, public_key)?;
 
-    pub fn verify(&self, tx_payload: &[u8], public_key: [u8; 32]) -> Result<(), ()> {
-        let basic_sig = p256_signature_from_der(&self.signature().0)
-            //.map_err(|e| format!("Failed to parse EcdsaP256 signature: {}", e))?;
-            .map_err(|e| ())?;
+        let client_data_json: ClientData = serde_json::from_slice(&self.client_data_json).unwrap();
 
-        let data = match WebAuthnData::try_from(self) {
-            Ok(data) => data,
-            Err(err) => {
-                // return Err(format!("WebAuthn data creation failed: {}", err));
-                return Err(());
-            }
-        };
+        let challenge = client_data_json.challenge;
 
-        p256_verify_signature_with_pubkey(&basic_sig.clone(), &data, public_key).map_err(|e| {
-            // format!(
-            //     "Verifying signature failed. signature: {:?}; data: {:?}; public_key: {:?}. Error: {}",
-            //     basic_sig, data.clone(), public_key, e
-            // )
-            ()
-        })?;
-
-        // The challenge in the webauthn envelope must match signed bytes.
-        if &data.challenge() != tx_payload {
-            // Err(format!(
-            //     "Challenge in webauthn is {:?} while it is expected to be {:?}",
-            //     data.challenge(),
-            //     tx_payload,
-            // ))
+        if challenge != tx_payload {
             Err(())
         } else {
             Ok(())
@@ -133,39 +75,48 @@ impl WebAuthnSignature {
     }
 }
 
-impl TryFrom<&[u8]> for WebAuthnSignature {
-    type Error = ();
+pub fn p256_verify_signature_with_pubkey(sig: &[u8], data: &[u8], pubkey: &[u8]) -> Result<(), ()> {
+    let signature = p256::ecdsa::Signature::from_der(sig).unwrap();
 
-    fn try_from(blob: &[u8]) -> Result<Self, Self::Error> {
-        let signature: WebAuthnSignature = serde_cbor::from_slice(blob)
-            // .map_err(|err| format!("Signature CBOR parsing failed with: {}", err))?;
-            .map_err(|e| ())?;
-        Ok(signature)
+    let pubkey = p256::ecdsa::VerifyingKey::from_sec1_bytes(&pubkey).unwrap();
+
+    let normalized_sig = signature.normalize_s().unwrap_or(signature);
+
+    pubkey.verify(&data, &normalized_sig).map_err(|_| ())?;
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use array_bytes::hex2bytes;
+
+    use super::*;
+
+    #[test]
+    fn verify_passkey() {
+        let pubkey = hex2bytes("0x0458b65f6095428f3942bb4a2cb316f1f3604f3d2cd331d9451b1a3fdc7b849e805179488b34d09284a9209a28fea7602ddf3b3800aabec945d64ac55d3e6e47a5").unwrap();
+
+        let auth = AuthenticatorAssertionResponseRaw {
+            authenticator_data:
+                hex2bytes(
+                    "0x49960de5880e8c687434170f6476605b8fe4aeb9a28632c7995cf3ba831d97630500000000",
+                )
+                .unwrap(),
+
+            client_data_json:
+                hex2bytes(
+                    "0x7b2274797065223a22776562617574686e2e676574222c226368616c6c656e6765223a2241514944222c226f726967696e223a2268747470733a2f2f6c6f63616c686f73743a38303030222c2263726f73734f726967696e223a66616c73652c226f746865725f6b6579735f63616e5f62655f61646465645f68657265223a22646f206e6f7420636f6d7061726520636c69656e74446174614a534f4e20616761696e737420612074656d706c6174652e205365652068747470733a2f2f676f6f2e676c2f796162506578227d",
+                )
+                .unwrap(),
+
+            signature:
+             hex2bytes("0x3045022100cb29ed642aa9ec7fe4f6e7e22ab1fb8fbbd162e7f61ec469b650020418436ea902206c384157c1f0d896aff7b74196bbb42a4f1bda2c02dbc3496286df17bba3ea5b").unwrap(),
+
+             user_handle: Some(
+                  hex2bytes("0x01").unwrap()),
+        };
+
+        auth.verify(&[1, 2, 3], &pubkey).unwrap();
     }
-}
-
-pub fn p256_signature_from_der(sig_der: &[u8]) -> Result<[u8; 64], ()> {
-    let sig = p256::ecdsa::Signature::from_der(sig_der)
-        //.map_err(|e| e.to_string())?;
-        .map_err(|e| ())?;
-
-    let sig_bytes: [u8; 64] = sig.to_bytes().into();
-    Ok(sig_bytes)
-}
-
-pub fn p256_verify_signature_with_pubkey(
-    sig: &[u8; 64],
-    data: &WebAuthnData,
-    pubkey: [u8; 32],
-) -> Result<(), ()> {
-    let signature = p256::ecdsa::Signature::from_bytes(sig[..64].into()).unwrap();
-
-    let pubkey = p256::ecdsa::VerifyingKey::from_sec1_bytes(&pubkey)
-        //.map_err(|e| e.to_string())?;
-        .map_err(|e| ())?;
-
-    pubkey
-        .verify(&data.signed_bytes, &signature)
-        //.map_err(|e| e.to_string())
-        .map_err(|e| ())
 }
